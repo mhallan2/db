@@ -324,7 +324,7 @@ d.department_name "DEPARTMENT_NAME",
 j.job_title "JOB_TITLE"
 FROM employees e
 JOIN departments d USING(department_id)
-JOIN jobs j ON e.job_id = j.job_id
+JOIN jobs j USING(job_id)
 WHERE e.salary > 10000
 ORDER BY e.salary ASC;
 
@@ -352,3 +352,100 @@ SELECT e.first_name "Имя", e.last_name "Фамилия", e.job_id "Должн
 REPLACE(TO_CHAR(e.salary, 'FM9999999990D00'), '.', ',') "Оклад"
 FROM employees e
 WHERE (e.job_id, e.salary) IN (SELECT job_id, max_salary FROM jobs);
+
+
+--------------------Лабораторная 4
+--0
+DROP TABLE IF EXISTS deps CASCADE;
+
+--1
+CREATE TABLE deps (
+    id INTEGER PRIMARY KEY,
+    name VARCHAR(64) NOT NULL CHECK (length(name) > 0),
+    region VARCHAR(64) NOT NULL CHECK (length(region) > 0)
+);
+
+select * from deps;
+
+--2
+CREATE SEQUENCE deps_id_seq
+    START WITH 1
+    INCREMENT BY 4
+    CYCLE
+    CACHE 1;
+
+--3
+INSERT INTO deps (id, name, region)
+VALUES (nextval('deps_id_seq'), 'Direction', 'Mars');
+
+select * from deps;
+
+--4
+INSERT INTO deps (id, name, region)
+SELECT
+    nextval('deps_id_seq'),
+    d.department_name,
+    left(r.region_name, 2)
+FROM departments d
+JOIN locations l ON l.location_id = d.location_id
+JOIN countries c ON c.country_id  = l.country_id
+JOIN regions  r ON r.region_id    = c.region_id;
+
+--5
+UPDATE deps
+SET region = 'Europe'
+WHERE name = 'Sales';
+
+--6
+DELETE FROM deps
+WHERE id % 2 = 0;
+
+--7
+WITH RECURSIVE managers AS
+(
+    SELECT m.employee_id,
+           m.first_name,
+           m.last_name,
+           m.manager_id,
+           m.department_id,
+           ARRAY[e.employee_id, m.employee_id] AS path
+
+    FROM employees AS e
+    JOIN employees AS m
+	  ON m.employee_id = e.manager_id
+	  
+    WHERE e.employee_id = 105
+
+    UNION ALL
+
+    SELECT m.employee_id,
+           m.first_name,
+           m.last_name,
+           m.manager_id,
+           m.department_id,
+           managers.path || m.employee_id
+		   
+    FROM managers
+    JOIN employees AS m
+      ON m.employee_id = managers.manager_id
+	  
+    WHERE NOT m.employee_id = ANY(managers.path)
+)
+
+SELECT managers.employee_id,
+       managers.first_name,
+       managers.last_name,
+       regions.region_name
+	   
+FROM managers
+LEFT JOIN departments
+  ON departments.department_id = managers.department_id
+  
+LEFT JOIN locations
+  ON locations.location_id = departments.location_id
+  
+LEFT JOIN countries
+  ON countries.country_id = locations.country_id
+  
+LEFT JOIN regions
+  ON regions.region_id = countries.region_id;
